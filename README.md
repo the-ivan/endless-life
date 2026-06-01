@@ -1,5 +1,7 @@
 # Endless Life
 
+![Endless Life Demo](assets/endless-life-demo.gif)
+
 Conway's Game of Life for the Nothing Phone (3) Glyph Matrix.
 
 ## Features
