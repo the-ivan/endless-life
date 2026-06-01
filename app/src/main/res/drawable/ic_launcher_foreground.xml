@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Dark circular background matching the toy_preview.png -->
+    <path
+        android:fillColor="#222222"
+        android:pathData="M54,54m-48,0a48,48 0,1 1,96 0a48,48 0,1 1,-96 0" />
+
+    <!-- Three gliders in V formation, all flying toward the top-right.
+         One in top-right, one in top-left (slightly behind), one in bottom-center.
+         Positions and spacing inspired by the original toy_preview.png -->
+
+    <!-- Glider 1 - Top Right (exact pattern) -->
+    <path android:fillColor="#FFFFFF" android:pathData="M56,31 h7 v7 h-7z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M63,31 h7 v7 h-7z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M70,31 h7 v7 h-7z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M70,38 h7 v7 h-7z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M63,45 h7 v7 h-7z"/>
+
+    <!-- Glider 2 - Top Left behind (exact pattern) -->
+    <path android:fillColor="#FFFFFF" android:pathData="M27,39 h7 v7 h-7z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M34,39 h7 v7 h-7z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M41,39 h7 v7 h-7z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M41,46 h7 v7 h-7z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M34,53 h7 v7 h-7z"/>
+
+    <!-- Glider 3 - Bottom Center (exact pattern) -->
+    <path android:fillColor="#FFFFFF" android:pathData="M42,66 h7 v7 h-7z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M49,66 h7 v7 h-7z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M56,66 h7 v7 h-7z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M56,73 h7 v7 h-7z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M49,80 h7 v7 h-7z"/>
+
+</vector>

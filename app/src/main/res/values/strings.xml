@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Endless Life</string>
+    <string name="toy_name">Endless Life</string>
+    <string name="toy_summary">An endless source of life on the Glyph Matrix</string>
+</resources>

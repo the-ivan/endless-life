@@ -7,7 +7,7 @@ Life begins when you put the phone face-down. It never really ends — just gent
 ## Features
 
 - **Endless cycles** — Seamless pause + 1.5s fade into the next life
-- **Time-seeded patterns** — Same minute = same starting world
+- **Time-seeded patterns** — Same minute + second = same starting world (quick deaths get different patterns)
 - **Natural endings** — Stabilizes or goes extinct on its own
 - **8 starting animations** — All tuned to ~1.15s, chosen randomly
 - **Glyph Button** — Long press forces a fresh life
@@ -49,7 +49,7 @@ app/src/main/java/com/theivan/endlesslife/
 - Built for **Always-on Glyph Toy** use.
 - Long-press the Glyph Button to force a new life.
 - No artificial mask — the simulation runs on the full 25×25 grid.
-- Brightness is approximated from the system screen brightness.
+- Brightness is currently fixed (easy to make dynamic from system brightness if desired).
 
 ## Credits
 

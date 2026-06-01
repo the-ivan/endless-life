@@ -1,0 +1,37 @@
+package com.theivan.endlesslife
+
+import android.content.Context
+import android.content.SharedPreferences
+
+class SettingsRepository(context: Context) {
+
+    private val prefs: SharedPreferences =
+        context.getSharedPreferences("endless_life_settings", Context.MODE_PRIVATE)
+
+    fun getSettings(): EndlessLifeSettings {
+        val enabledNames = prefs.getStringSet("enabled_animations", null)
+            ?: StartingAnimationType.values().map { it.name }.toSet()
+
+        val enabled = enabledNames.mapNotNull { name ->
+            runCatching { StartingAnimationType.valueOf(name) }.getOrNull()
+        }.toSet().ifEmpty { StartingAnimationType.values().toSet() }
+
+        return EndlessLifeSettings(
+            enabledAnimations = enabled,
+            simulationSpeedMs = prefs.getLong("simulation_speed_ms", 220L),
+            initialDensity = prefs.getFloat("initial_density", 0.33f).toDouble(),
+            resumeEnabled = prefs.getBoolean("resume_enabled", true),
+            maxResumeAgeMinutes = prefs.getInt("max_resume_age_minutes", 5)
+        )
+    }
+
+    fun saveSettings(settings: EndlessLifeSettings) {
+        prefs.edit()
+            .putStringSet("enabled_animations", settings.enabledAnimations.map { it.name }.toSet())
+            .putLong("simulation_speed_ms", settings.simulationSpeedMs)
+            .putFloat("initial_density", settings.initialDensity.toFloat())
+            .putBoolean("resume_enabled", settings.resumeEnabled)
+            .putInt("max_resume_age_minutes", settings.maxResumeAgeMinutes)
+            .commit()
+    }
+}

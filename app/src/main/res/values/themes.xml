@@ -1,0 +1,5 @@
+<resources>
+    <!-- Normal visible theme for the dev helper activity.
+         The activity has real UI (instructions + button), so it cannot use NoDisplay. -->
+    <style name="Theme.EndlessLife" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>
