@@ -133,29 +133,11 @@ abstract class GlyphMatrixService(private val tag: String) : Service() {
     /**
      * Called roughly every minute while this toy is the active Always-on Glyph Toy
      * and the face-down (Flip to Glyph) conditions are met.
-     *
-     * This is the recommended way to drive ongoing/ambient behavior for AOD toys.
      */
     open fun onAODEvent() {}
-
-    /**
-     * Safely performs a matrix update on the main thread using the toy-appropriate API.
-     * For Glyph Toys, always use setMatrixFrame (setAppMatrixFrame is for apps that must not
-     * conflict with active toys). Swallows transient errors common during rapid updates / unbind races.
-     */
-    protected fun safeMatrixUpdate(action: (GlyphMatrixManager) -> Unit) {
-        val manager = glyphMatrixManager ?: return
-        try {
-            action(manager)
-        } catch (e: Exception) {
-            Log.w(LOG_TAG, "$tag: Matrix update failed", e)
-        }
-    }
 }
 
-/** Top-level safe update helper for use in animation objects and other contexts.
- *  Uses the toy setMatrixFrame path (do not use setAppMatrixFrame inside toys).
- */
+/** Top-level safe update helper for use in animation objects and other contexts. */
 fun safeMatrixUpdate(manager: GlyphMatrixManager?, action: (GlyphMatrixManager) -> Unit) {
     manager ?: return
     try {

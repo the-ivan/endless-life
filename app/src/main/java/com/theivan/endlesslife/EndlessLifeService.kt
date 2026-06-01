@@ -13,6 +13,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Calendar
+import androidx.core.content.edit
 
 /**
  * Endless Life — Conway's Game of Life for the Nothing Phone (3) Glyph Matrix.
@@ -26,17 +27,10 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
 
     private var serviceJob = SupervisorJob()
     private var backgroundScope = CoroutineScope(Dispatchers.IO + serviceJob)
-
     private val settingsRepository by lazy { SettingsRepository(applicationContext) }
-
     private var currentEngine: LifeGameEngine? = null
-
     private var lifeCycleJob: Job? = null
-
-    // Simple debounce for long press to avoid spamming ending transitions
     private var lastLongPressTimeMs = 0L
-
-    // Tracks starting animation state for the current life (used for interrupted reveal resume)
     private var currentLifeStartingAnimType: StartingAnimationType? = null
     private var currentLifeAnimComplete: Boolean = false
 
@@ -66,7 +60,7 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
 
         when {
             persisted == null -> {
-                // Brand new life → pick animation, mark incomplete
+                // Brand new life - pick animation, mark incomplete
                 val (grid, type) = generateFreshPattern()
                 currentLifeStartingAnimType = type
                 currentLifeAnimComplete = false
@@ -77,7 +71,7 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
 
             !persisted.startingAnimComplete -> {
                 // We have a saved grid but its starting animation was never completed
-                // (e.g. unbind happened during reveal). Replay the *same* animation.
+                // (e.g. unbind happened during reveal). Replay the same animation.
                 val type = persisted.startingAnimType
                     ?: (settings.enabledAnimations.randomOrNull() ?: StartingAnimationType.ROW_BY_ROW)
                 currentLifeStartingAnimType = type
@@ -117,20 +111,17 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
         }
 
         lifeCycleJob?.cancel()
-        Log.d("EndlessLife", ">>> Launching lifeCycleJob (driver + possible reveal) <<<")
         lifeCycleJob = backgroundScope.launch {
             if (initialGridForReveal != null && animTypeForThisLife != null) {
                 try {
                     StartingAnimation.playAnimation(manager, initialGridForReveal, BRIGHTNESS, animTypeForThisLife)
-
-                    // Animation finished successfully for this life → mark complete and persist
                     currentLifeAnimComplete = true
                     saveLifeState(engine.getGrid(), 0, currentLifeStartingAnimType, true)
                 } catch (e: Exception) {
                     Log.w("EndlessLife", "Reveal animation failed", e)
                 }
             }
-            runSimpleDriver(manager, engine)
+            runDriver(manager, engine)
         }
     }
 
@@ -168,8 +159,6 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
         Log.d("EndlessLife", ">>> onDestroy CALLED <<<")
         super.onDestroy()
 
-        // Best effort: try to leave the matrix clean if we reach destroy without going through
-        // the normal unbind path (force stop, crash, etc.).
         try {
             glyphMatrixManager?.setMatrixFrame(GlyphRenderer.emptyFrame())
         } catch (_: Exception) {}
@@ -195,8 +184,6 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
         currentEngine = null
 
         if (mgr != null && engineSnapshot != null) {
-            // Force ending fade on current life, then start a fresh one.
-            // Works whether we were in a reveal, live sim, or already fading.
             lifeCycleJob = backgroundScope.launch {
                 try {
                     val grid = engineSnapshot.getGrid()
@@ -204,12 +191,9 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
                 } catch (_: Exception) {}
 
                 delay(1000L)
-
-                // Now do the fresh next life (the clearLifeState above guarantees it's not a resume)
                 startFreshLife(mgr)
             }
         } else if (mgr != null) {
-            // No active life to end (very early state) — just start a fresh one
             startFreshLife(mgr)
         }
     }
@@ -248,12 +232,10 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
         currentLifeStartingAnimType = type
         currentLifeAnimComplete = false
 
-        Log.d("EndlessLife", ">>> Long press — forcing fresh life with starting animation <<<")
-
         lifeCycleJob?.cancel()
         lifeCycleJob = backgroundScope.launch {
             prepareAndPlayNewLife(manager, engine)
-            runSimpleDriver(manager, engine)
+            runDriver(manager, engine)
         }
     }
 
@@ -278,28 +260,12 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
         }
     }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     /**
      * The main simulation loop. Runs while the service is bound.
      */
-    private suspend fun runSimpleDriver(manager: GlyphMatrixManager, engine: LifeGameEngine) {
+    private suspend fun runDriver(manager: GlyphMatrixManager, engine: LifeGameEngine) {
         val stability = StabilityDetector()
         var currentSpeed = settingsRepository.getSettings().simulationSpeedMs
-        var currentDensity = settingsRepository.getSettings().initialDensity
         var stableSince: Long = 0
 
         stability.reset()
@@ -315,7 +281,6 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
                 }
             }
 
-            // Check for ending *before* stepping, so we fade the exact generation we just displayed.
             if (stability.addAndCheck(currentGrid)) {
                 if (stableSince == 0L) {
                     stableSince = System.currentTimeMillis()
@@ -326,9 +291,6 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
 
             val endedNaturally = engine.isExtinct() || (stableSince > 0 && System.currentTimeMillis() - stableSince >= STABLE_TIME_MS)
             if (endedNaturally) {
-                stableSince = 0L
-
-                // Long press / natural end: clear state immediately so the dying life cannot be resumed.
                 clearLifeState()
                 resetCurrentLifeAnimationState()
 
@@ -342,10 +304,8 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
                 stability.reset()
                 stableSince = 0L
 
-                // Refresh local copies in case user changed settings
                 val s = settingsRepository.getSettings()
                 currentSpeed = s.simulationSpeedMs
-                currentDensity = s.initialDensity
 
                 continue
             }
@@ -378,13 +338,13 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
                     flat.append(if (cell == 1) '1' else '0')
                 }
             }
-            prefs.edit()
-                .putString(KEY_GRID, flat.toString())
-                .putInt(KEY_GENERATION, generation)
-                .putString(KEY_STARTING_ANIM_TYPE, animType?.name)
-                .putBoolean(KEY_STARTING_ANIM_COMPLETE, animComplete)
-                .putLong(KEY_LAST_SAVE, System.currentTimeMillis())
-                .apply()
+            prefs.edit {
+                putString(KEY_GRID, flat.toString())
+                    .putInt(KEY_GENERATION, generation)
+                    .putString(KEY_STARTING_ANIM_TYPE, animType?.name)
+                    .putBoolean(KEY_STARTING_ANIM_COMPLETE, animComplete)
+                    .putLong(KEY_LAST_SAVE, System.currentTimeMillis())
+            }
         } catch (e: Exception) {
             Log.w("EndlessLife", "Failed to save life state", e)
         }
@@ -444,7 +404,7 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
 
     private fun clearLifeState() {
         try {
-            getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().clear().apply()
+            getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit { clear() }
         } catch (e: Exception) {
             Log.w("EndlessLife", "Failed to clear life state", e)
         }
@@ -452,15 +412,10 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
 
     // ==================== End State Persistence ====================
 
-
-
-
-
-
     private companion object {
         private const val BRIGHTNESS = 2200
 
-        // How long a pattern must remain stable (visually unchanged) before we consider the life complete and fade it out.
+        // How long a pattern must remain stable before we fade it out.
         private const val STABLE_TIME_MS = 1500L
 
         // Persistence keys (must match what load/save expect)

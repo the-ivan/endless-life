@@ -46,5 +46,4 @@ object PatternGenerator {
         }
         return grid
     }
-
 }

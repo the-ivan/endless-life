@@ -1,7 +1,7 @@
 package com.theivan.endlesslife
 
 /**
- * 25×25 Conway's Game of Life. Runs full grid (physical LEDs act as viewport).
+ * 25×25 Conway's Game of Life.
  */
 class LifeGameEngine(
     val width: Int = GlyphRenderer.MATRIX_SIZE,

@@ -119,7 +119,6 @@ fun EndlessLifeSettingsScreen(
     var animationsExpanded by rememberSaveable { mutableStateOf(false) }
     var simulationExpanded by rememberSaveable { mutableStateOf(false) }
     var resumeExpanded by rememberSaveable { mutableStateOf(false) }
-    var appearanceExpanded by rememberSaveable { mutableStateOf(false) }
 
     fun updateSettings(newSettings: EndlessLifeSettings) {
         settings = newSettings
@@ -169,7 +168,7 @@ fun EndlessLifeSettingsScreen(
             onExpandedChange = { animationsExpanded = it }
         ) {
 
-        StartingAnimationType.values().forEach { type ->
+        StartingAnimationType.entries.forEach { type ->
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(vertical = 2.dp)
@@ -206,7 +205,6 @@ fun EndlessLifeSettingsScreen(
             Text("Fast", style = MaterialTheme.typography.labelSmall)
         }
 
-        // 11 discrete speeds. 220ms sits two pips right of center, with 3 faster options after it.
         val speedOptions = listOf(900L, 780L, 660L, 550L, 450L, 360L, 280L, 220L, 160L, 105L, 55L)
         val lastIndex = speedOptions.lastIndex
 
@@ -311,8 +309,6 @@ fun EndlessLifeSettingsScreen(
         )
         }
 
-        // Dialog must be at Scaffold root level (not inside the scrolling Column) or it
-        // participates in layout and looks broken.
         if (showResetDialog) {
             AlertDialog(
                 onDismissRequest = { showResetDialog = false },

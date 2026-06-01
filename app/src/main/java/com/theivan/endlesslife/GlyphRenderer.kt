@@ -10,7 +10,6 @@ object GlyphRenderer {
 
     /**
      * Renders into a pre-allocated buffer (avoids allocations in the hot loop).
-     * This is the fast raw path.
      */
     fun renderInto(grid: Array<IntArray>, brightness: Int, outFrame: IntArray) {
         require(grid.size == MATRIX_SIZE && grid.all { it.size == MATRIX_SIZE }) {
@@ -30,7 +29,7 @@ object GlyphRenderer {
     }
 
     /**
-     * Convenience version that allocates a new array (use only when you don't have a reusable one).
+     * Convenience version that allocates a new array.
      */
     fun render(grid: Array<IntArray>, brightness: Int): IntArray {
         val frame = IntArray(FRAME_SIZE)
@@ -39,13 +38,12 @@ object GlyphRenderer {
     }
 
     /**
-     * Returns a pre-sized empty frame (all zeros).
+     * Returns a pre-sized empty frame.
      */
     fun emptyFrame(): IntArray = IntArray(FRAME_SIZE)
 
     /**
      * Renders only the cells for which the predicate returns true.
-     * Extremely useful for reveal / build animations.
      */
     fun renderMasked(
         grid: Array<IntArray>,

@@ -175,7 +175,6 @@ object StartingAnimation {
         holdAtFullMs: Long = 500L
     ) {
         try {
-            // Ramp phase (linear)
             for (step in 1..steps) {
                 val t = step / steps.toFloat()
                 val currentBrightness = (brightness * t).toInt().coerceAtLeast(0)
@@ -196,7 +195,6 @@ object StartingAnimation {
                 delay(stepDelayMs)
             }
 
-            // Hold at full brightness
             val fullFrame = IntArray(MATRIX * MATRIX)
             for (r in 0 until MATRIX) {
                 for (c in 0 until MATRIX) {
@@ -214,18 +212,6 @@ object StartingAnimation {
         } catch (e: CancellationException) {
             throw e
         }
-    }
-
-    /**
-     * Picks a random starting animation and plays it.
-     * This makes each new life feel fresh.
-     */
-    suspend fun randomReveal(
-        manager: GlyphMatrixManager,
-        initialGrid: Array<IntArray>,
-        brightness: Int
-    ) {
-        playAnimation(manager, initialGrid, brightness, StartingAnimationType.values().random())
     }
 
     suspend fun playAnimation(
@@ -265,11 +251,10 @@ object StartingAnimation {
         var c = center
         var dir = 0
         var steps = 1          // current leg length
-        var stepsTaken = 0
         var legCount = 0
 
         // Start at center
-        if (r in 0 until MATRIX && c in 0 until MATRIX) {
+        if (r in 0 until MATRIX) {
             visited[r][c] = true
             result.add(r to c)
         }

@@ -24,7 +24,7 @@ enum class StartingAnimationType {
 }
 
 data class EndlessLifeSettings(
-    val enabledAnimations: Set<StartingAnimationType> = StartingAnimationType.values().toSet(),
+    val enabledAnimations: Set<StartingAnimationType> = StartingAnimationType.entries.toSet(),
     val simulationSpeedMs: Long = 220L,
     val initialDensity: Double = 0.33,
     val resumeEnabled: Boolean = true,
