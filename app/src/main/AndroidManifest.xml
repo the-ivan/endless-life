@@ -13,7 +13,7 @@
         android:supportsRtl="true"
         tools:targetApi="31">
 
-        <!-- Dev / test activity -->
+        <!-- Settings UI (also used as launcher activity for manual testing). -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -57,7 +57,7 @@
                 android:value="1" />
         </service>
 
-        <!-- Glyph development key -->
+        <!-- Nothing developer key. "test" is standard for dev + community toys. -->
         <meta-data
             android:name="NothingKey"
             android:value="test" />

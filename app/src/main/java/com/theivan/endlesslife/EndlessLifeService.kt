@@ -34,9 +34,8 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
     private var currentLifeStartingAnimType: StartingAnimationType? = null
     private var currentLifeAnimComplete: Boolean = false
 
-
     override fun performOnServiceConnected(context: Context, manager: GlyphMatrixManager) {
-        Log.d("EndlessLife", ">>> performOnServiceConnected CALLED <<< (matrixLen=$detectedMatrixLength)")
+        Log.d("EndlessLife", "performOnServiceConnected (matrixLen=$detectedMatrixLength)")
 
         // Always start with a fresh scope for this bind session.
         serviceJob = SupervisorJob()
@@ -60,7 +59,7 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
 
         when {
             persisted == null -> {
-                // Brand new life - pick animation, mark incomplete
+                // Fresh life: pick anim type, mark reveal incomplete.
                 val (grid, type) = generateFreshPattern()
                 currentLifeStartingAnimType = type
                 currentLifeAnimComplete = false
@@ -81,7 +80,7 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
                 initialGridForReveal = persisted.grid
                 animTypeForThisLife = type
 
-                Log.d("EndlessLife", ">>> Resuming interrupted starting animation (type=$type) <<<")
+                Log.d("EndlessLife", "Resuming interrupted starting animation (type=$type)")
             }
 
             else -> {
@@ -96,18 +95,14 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
         }
         currentEngine = engine
 
-        // For true mid-sim resume: push the saved grid immediately (no animation).
-        // For anything that needs a reveal (fresh or interrupted): let the animation draw first.
+        // Mid-sim resume: push saved grid immediately (no anim). Fresh/interrupted: let StartingAnimation draw first frame(s).
         if (initialGridForReveal == null) {
             val firstFrame = GlyphRenderer.render(engine.getGrid(), BRIGHTNESS)
             try {
                 manager.setMatrixFrame(firstFrame)
-                Log.d("EndlessLife", ">>> First frame pushed (mid-sim resume) <<<")
             } catch (e: Exception) {
                 Log.w("EndlessLife", "Initial frame failed", e)
             }
-        } else {
-            Log.d("EndlessLife", ">>> Will play starting animation (fresh or interrupted life) <<<")
         }
 
         lifeCycleJob?.cancel()
@@ -126,7 +121,7 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
     }
 
     override fun performOnServiceDisconnected(context: Context) {
-        Log.d("EndlessLife", ">>> performOnServiceDisconnected CALLED <<<")
+        Log.d("EndlessLife", "performOnServiceDisconnected")
 
         glyphMatrixManager?.let { mgr ->
             try {
@@ -151,12 +146,12 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
     }
 
     override fun onCreate() {
-        Log.d("EndlessLife", ">>> onCreate CALLED <<<")
+        Log.d("EndlessLife", "onCreate")
         super.onCreate()
     }
 
     override fun onDestroy() {
-        Log.d("EndlessLife", ">>> onDestroy CALLED <<<")
+        Log.d("EndlessLife", "onDestroy")
         super.onDestroy()
 
         try {
@@ -165,11 +160,11 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
     }
 
     override fun onGlyphLongPress() {
-        Log.i("EndlessLife", ">>> onGlyphLongPress RECEIVED <<<")
+        Log.i("EndlessLife", "onGlyphLongPress")
 
         val now = System.currentTimeMillis()
         if (now - lastLongPressTimeMs < 700L) {
-            return   // debounce rapid presses
+            return  // debounce rapid presses
         }
         lastLongPressTimeMs = now
 
@@ -177,7 +172,7 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
         resetCurrentLifeAnimationState()
 
         val mgr = glyphMatrixManager
-        val engineSnapshot = currentEngine   // capture the current grid before we nuke things
+        val engineSnapshot = currentEngine  // snapshot grid for the ending fade before clearing state
 
         lifeCycleJob?.cancel()
         lifeCycleJob = null
@@ -316,13 +311,11 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
     }
 
     // ==================== State Persistence (SharedPreferences) ====================
-    // We persist the grid so the simulation can resume across the system's bind/unbind cycles
-    // for Always-on Glyph Toy use.
+    // Persist grid + anim progress so the sim can resume across bind/unbind (AOD / Flip to Glyph).
 
     /**
-     * Persists the current life grid + metadata.
-     * animType + animComplete let us detect "this fresh life had its starting animation interrupted"
-     * and replay the *same* animation type on resume (see Option 3).
+     * Persists the current life grid + metadata (starting anim type + completion flag).
+     * This allows resuming an interrupted reveal animation with the exact same type.
      */
     private fun saveLifeState(
         grid: Array<IntArray>,
@@ -350,9 +343,7 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
         }
     }
 
-    /**
-     * Rich persisted state for a life, including whether its starting animation completed.
-     */
+    /** Persisted snapshot of a life (grid + whether its starting reveal completed). */
     private data class PersistedLifeState(
         val grid: Array<IntArray>,
         val generation: Int,
@@ -370,7 +361,7 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
             val animComplete = prefs.getBoolean(KEY_STARTING_ANIM_COMPLETE, false)
             val lastSave = prefs.getLong(KEY_LAST_SAVE, 0)
 
-            // Honor the user's "max resume age" setting (falls back to 5 min).
+            // Apply the user's max resume age from settings (fallback 5 min).
             val maxAgeMin = try {
                 getSharedPreferences("endless_life_settings", Context.MODE_PRIVATE)
                     .getInt("max_resume_age_minutes", 5)
