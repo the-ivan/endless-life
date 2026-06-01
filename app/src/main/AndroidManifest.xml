@@ -57,7 +57,7 @@
                 android:value="1" />
         </service>
 
-        <!-- Test key for development (expires after ~48h). Replace for release. -->
+        <!-- Glyph development key -->
         <meta-data
             android:name="NothingKey"
             android:value="test" />

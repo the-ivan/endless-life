@@ -10,22 +10,15 @@ import kotlin.math.pow
 import kotlin.random.Random
 
 /**
- * Reveal animations that play before each new life begins.
+ * Starting reveal animations for new lives.
  */
 object StartingAnimation {
 
     private const val MATRIX = GlyphRenderer.MATRIX_SIZE
 
-    /**
-     * Target total duration for the build-style starting animations.
-     * All structural reveals (row, column, center, spirals) now target ~1.1–1.25s.
-     */
     private const val TARGET_DURATION_MS = 1150L
 
-    /**
-     * Reveals the initial pattern row by row from the top down.
-     * This is a nice, calm "building up" animation.
-     */
+    /** Reveals the pattern row by row from the top. */
     suspend fun revealRowByRow(
         manager: GlyphMatrixManager,
         initialGrid: Array<IntArray>,
@@ -45,9 +38,7 @@ object StartingAnimation {
         }
     }
 
-    /**
-     * Reveals the initial pattern column by column from left to right.
-     */
+    /** Reveals the pattern column by column from left to right. */
     suspend fun revealColumnByColumn(
         manager: GlyphMatrixManager,
         initialGrid: Array<IntArray>,
@@ -67,9 +58,7 @@ object StartingAnimation {
         }
     }
 
-    /**
-     * Reveals the initial pattern row by row from the bottom up.
-     */
+    /** Reveals the pattern row by row from the bottom up. */
     suspend fun revealBottomUp(
         manager: GlyphMatrixManager,
         initialGrid: Array<IntArray>,
@@ -176,10 +165,7 @@ object StartingAnimation {
         revealAlongPath(manager, initialGrid, brightness, coords, stepDelayMs, chunkSize)
     }
 
-    /**
-     * Fades in the entire initial pattern gradually (linear),
-     * then holds at full brightness for `holdAtFullMs`.
-     */
+    /** Linear fade-in followed by hold at full brightness. */
     suspend fun fadeIn(
         manager: GlyphMatrixManager,
         initialGrid: Array<IntArray>,

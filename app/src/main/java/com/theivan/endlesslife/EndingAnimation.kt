@@ -7,15 +7,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 /**
- * Pause + smooth fade-out between lives.
+ * Ending fade transition between lives.
  */
 object EndingAnimation {
 
     private const val MATRIX = 25
 
-    /**
-     * 50 steps over 1.2s for a silky brightness fade.
-     */
+    /** 50-step brightness fade over 1.2s. */
     suspend fun pauseAndFadeOut(
         manager: GlyphMatrixManager,
         grid: Array<IntArray>,

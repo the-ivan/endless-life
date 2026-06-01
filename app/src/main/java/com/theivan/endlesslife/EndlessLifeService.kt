@@ -15,14 +15,12 @@ import kotlinx.coroutines.withContext
 import java.util.Calendar
 
 /**
- * Endless Life — clean, resilient Conway Life toy for Nothing Phone (3) Glyph Matrix.
+ * Endless Life — Conway's Game of Life for the Nothing Phone (3) Glyph Matrix.
  *
- * - Fresh: time-seeded grid + random starting reveal (~1.15s) → sim until natural end
- * - Resume (after OS unbind): load grid → continue sim (no anim) — critical for AOD Flip-to-Glyph
- * - Natural ends: extinct OR stable/oscillating (StabilityDetector) → pause+fade → new life+reveal
- * - All matrix writes via setMatrixFrame (the toy API; setApp* is only for non-toy apps)
- * - State persisted to prefs on unbind/AOD so short bind windows don't lose progress
- * - Always black + turnOff on unbind to prevent the "last frame leaks after switch" regression
+ * - Persistent across binds/unbinds (supports Always-on / Flip to Glyph)
+ * - Time-seeded patterns with automatic stable/extinct detection
+ * - Starting reveal animations and graceful ending fade
+ * - Long press forces a new life via ending transition
  */
 class EndlessLifeService : GlyphMatrixService("Endless-Life") {
 
@@ -38,8 +36,7 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
     // Simple debounce for long press to avoid spamming ending transitions
     private var lastLongPressTimeMs = 0L
 
-    // Tracks the starting animation chosen for the *current* life.
-    // Lets us replay the *exact same* animation if the system unbinds during the reveal (Option 3).
+    // Tracks starting animation state for the current life (used for interrupted reveal resume)
     private var currentLifeStartingAnimType: StartingAnimationType? = null
     private var currentLifeAnimComplete: Boolean = false
 
@@ -198,9 +195,8 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
         currentEngine = null
 
         if (mgr != null && engineSnapshot != null) {
-            // Long press = "kill the current life with the nice ending fade",
-            // then start the next fresh simulation.
-            // This works from any phase: mid starting animation, live sim, or mid-ending.
+            // Force ending fade on current life, then start a fresh one.
+            // Works whether we were in a reveal, live sim, or already fading.
             lifeCycleJob = backgroundScope.launch {
                 try {
                     val grid = engineSnapshot.getGrid()
@@ -241,10 +237,8 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
     }
 
     /**
-     * Immediately starts a completely fresh life (with its starting reveal animation)
-     * and runs the driver. Cancels any previous life job first.
-     * This is what makes long-press "cycle to the next simulation" reliably,
-     * no matter what phase we were in (starting anim, live sim, or ending fade).
+     * Starts a fresh life with reveal animation and runs the driver.
+     * Used after long press forced ending or early startup.
      */
     private fun startFreshLife(manager: GlyphMatrixManager) {
         val (grid, type) = generateFreshPattern()
@@ -264,9 +258,7 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
     }
 
     /**
-     * Prepares a fresh pattern, plays its starting animation, marks it complete,
-     * and persists it. Used by both startFreshLife (long press path) and the
-     * natural ending path inside the driver.
+     * Creates a new time-seeded pattern, plays its reveal animation, and persists state.
      */
     private suspend fun prepareAndPlayNewLife(
         manager: GlyphMatrixManager,
@@ -336,10 +328,7 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
             if (endedNaturally) {
                 stableSince = 0L
 
-                // Minimal Option A: once we decide a life has ended, it is dead.
-                // Clear persisted state + the starting-anim tracking fields immediately.
-                // This prevents any unbind during the fade or black hold from resurrecting
-                // the old life (we don't want to "jump back in time").
+                // Long press / natural end: clear state immediately so the dying life cannot be resumed.
                 clearLifeState()
                 resetCurrentLifeAnimationState()
 
