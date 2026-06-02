@@ -69,7 +69,7 @@ abstract class GlyphMatrixService(private val tag: String) : Service() {
         override fun onServiceConnected(component: ComponentName?) {
             val mgr = glyphMatrixManager ?: return
 
-            // Official + community pattern: ask the SDK what device/matrix we actually have.
+            // Query runtime device matrix length (SDK + community pattern).
             val length = try {
                 Common.getDeviceMatrixLength()
             } catch (t: Throwable) {

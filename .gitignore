@@ -89,6 +89,9 @@ Thumbs.db
 # Nothing Glyph Matrix SDK AAR (must be downloaded manually)
 app/libs/*.aar
 
+# Historical AOD keepalive proposal (not for source control)
+PROPOSAL_AOD_ALWAYS_ON.md
+
 # Release outputs
 app/release/
 
