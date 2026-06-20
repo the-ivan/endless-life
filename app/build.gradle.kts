@@ -8,14 +8,21 @@ android {
     namespace = "com.theivan.endlesslife"
     compileSdk = 35
 
+    signingConfigs {
+        create("release") {
+            storeFile = file(System.getenv("USERPROFILE") + "/.android/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     defaultConfig {
         applicationId = "com.theivan.endlesslife"
-        // NOTE: The official Nothing GlyphMatrix SDK declares minSdk 33 internally.
-        // Do NOT lower this value or the manifest merger will fail.
         minSdk = 33
         targetSdk = 35
-        versionCode = 9
-        versionName = "0.9.0"
+        versionCode = 10
+        versionName = "0.9.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -25,7 +32,9 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -58,7 +67,7 @@ dependencies {
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.material:material-icons-extended")
+    implementation("androidx.compose.material:material-icons-extended")  // Icons.Default.* ; tree-shaken by R8 in release
 
     // Nothing Glyph Matrix SDK
     // IMPORTANT: Download glyph-matrix-sdk-2.0.aar (or latest) from:

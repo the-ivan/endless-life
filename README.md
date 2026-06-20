@@ -7,6 +7,8 @@ Conway's Game of Life for the Nothing Phone (3) Glyph Matrix.
 ## Features
 
 - Runs continuous simulations (supports Always-on / Flip to Glyph)
+- Default: pauses instantly in battery ambient (no sim on heartbeats)
+- Optional: ambient live sim (FG on battery, timeout/always, battery speed)
 - Time-seeded initial random patterns
 - Automatic detection of stable or extinct states
 - Multiple starting reveal animations
@@ -32,6 +34,7 @@ The app includes a settings screen with:
 - Simulation speed
 - Initial cell density
 - Resume behavior after unbind
+- AOD: always runs via foreground service when set as Always-on Glyph Toy (normal speed, no timeout)
 
 Long-press the Glyph button at any time to force a new life.
 

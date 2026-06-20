@@ -5,6 +5,12 @@
     <!-- Required to access the Glyph Matrix -->
     <uses-permission android:name="com.nothing.ketchum.permission.ENABLE" />
 
+    <!-- Foreground service + wake lock for AOD persistent running -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- API 34+: for specialUse fg type -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -28,6 +34,7 @@
         <service
             android:name=".EndlessLifeService"
             android:exported="true"
+            android:foregroundServiceType="specialUse"
             tools:ignore="ExportedService">
             <intent-filter>
                 <action android:name="com.nothing.glyph.TOY" />
@@ -55,6 +62,11 @@
             <meta-data
                 android:name="com.nothing.glyph.toy.longpress"
                 android:value="1" />
+
+            <!-- Justification for specialUse fg (AOD persistent) -->
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="ambient_glyph_aod" />
         </service>
 
         <!-- Nothing developer key. "test" is standard for dev + community toys. -->

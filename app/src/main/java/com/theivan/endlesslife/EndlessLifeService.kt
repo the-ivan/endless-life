@@ -1,8 +1,17 @@
 package com.theivan.endlesslife
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.os.PowerManager
+import android.provider.Settings
 import android.util.Log
+import androidx.core.content.edit
 import com.nothing.ketchum.GlyphMatrixManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -14,15 +23,12 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Calendar
-import androidx.core.content.edit
 
 /**
  * Endless Life — Conway's Game of Life for the Nothing Phone (3) Glyph Matrix.
  *
- * - Persistent across binds/unbinds (supports Always-on / Flip to Glyph)
- * - Time-seeded patterns with automatic stable/extinct detection
- * - Starting reveal animations and graceful ending fade
- * - Long press forces a new life via ending transition
+ * AOD support: when set as Always-on Glyph Toy, foreground service keeps the
+ * simulation running persistently at normal speed (no timeout, no pause on ambient).
  */
 class EndlessLifeService : GlyphMatrixService("Endless-Life") {
 
@@ -39,14 +45,29 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
     private var pendingRevealGrid: Array<IntArray>? = null
     private var pendingRevealType: StartingAnimationType? = null
 
+    // FG + wake for AOD persistent running
+    private var wakeLock: PowerManager.WakeLock? = null
+    private var isForegroundActive: Boolean = false
+    private var lastSaveTime: Long? = null
+
     override fun onCreate() {
         Log.d("EndlessLife", "onCreate")
         super.onCreate()
+        createNotificationChannel()
 
-        // Long-lived scope for driver across bind/unbind cycles (e.g. AOD).
-        // Cancel only onDestroy.
+        ensureAodForeground()
+        requestIgnoreBatteryOptimizationsIfNeeded()
+
         serviceJob = SupervisorJob()
         backgroundScope = CoroutineScope(Dispatchers.IO + serviceJob)
+
+        ensureDriverStartedEarly()
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Log.d("EndlessLife", "onStartCommand")
+        ensureAodForeground()
+        return Service.START_STICKY
     }
 
     override fun performOnServiceConnected(context: Context, manager: GlyphMatrixManager) {
@@ -79,12 +100,28 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
                 }
                 runDriver(manager, currentEngine!!)
             }
+            ensureAodForeground()
         } else if (currentEngine != null) {
             // Warm attach: push current frame (driver already running).
+            ensureAodForeground()
             try {
                 manager.setMatrixFrame(GlyphRenderer.render(currentEngine!!.getGrid(), BRIGHTNESS))
             } catch (e: Exception) {
                 Log.w("EndlessLife", "Initial frame failed", e)
+            }
+        }
+
+        if (pendingRevealGrid != null && pendingRevealType != null) {
+            backgroundScope.launch {
+                try {
+                    StartingAnimation.playAnimation(manager, pendingRevealGrid!!, BRIGHTNESS, pendingRevealType!!)
+                    currentLifeAnimComplete = true
+                    saveLifeState(currentEngine!!.getGrid(), 0, currentLifeStartingAnimType, true)
+                } catch (e: Exception) {
+                    Log.w("EndlessLife", "Reveal animation failed", e)
+                }
+                pendingRevealGrid = null
+                pendingRevealType = null
             }
         }
     }
@@ -93,7 +130,7 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
      * If no engine, init from persisted (or fresh). Returns true if reveal needed.
      * Pushes immediate frame for mid-sim resumes. Caller launches driver + reveal if needed.
      */
-    private fun initializeLifeIfNeeded(manager: GlyphMatrixManager): Boolean {
+    private fun initializeLifeIfNeeded(manager: GlyphMatrixManager?): Boolean {
         if (currentEngine != null) return false
 
         resetCurrentLifeAnimationState()
@@ -142,8 +179,8 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
         }
         currentEngine = engine
 
-        // Mid-sim resume: push immediately. (Reveal handled by caller for fresh/interrupted.)
-        if (initialGridForReveal == null) {
+        // Mid-sim resume: push immediately if we have a manager.
+        if (initialGridForReveal == null && manager != null) {
             val firstFrame = GlyphRenderer.render(engine.getGrid(), BRIGHTNESS)
             try {
                 manager.setMatrixFrame(firstFrame)
@@ -172,17 +209,15 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
             } catch (_: Exception) {}
         }
 
-        // Intentionally do NOT:
-        // - push black (base onUnbind does it)
-        // - cancel lifeCycleJob
-        // - null engine/pending state
-        // Keeps sim running across unbind gaps (e.g. AOD). Full cleanup in onDestroy.
+        ensureAodForeground()
     }
 
     override fun onDestroy() {
         Log.d("EndlessLife", "onDestroy")
         super.onDestroy()
 
+        stopForegroundIfActive()
+        releaseAodWakeLockIfHeld()
         serviceJob.cancel()
         try {
             glyphMatrixManager?.setMatrixFrame(GlyphRenderer.emptyFrame())
@@ -204,7 +239,7 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
         pendingRevealType = null
 
         val mgr = glyphMatrixManager
-        val engineSnapshot = currentEngine  // snapshot grid for the ending fade before clearing state
+        val engineSnapshot = currentEngine
 
         lifeCycleJob?.cancel()
         lifeCycleJob = null
@@ -230,32 +265,8 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
 
         val mgr = glyphMatrixManager ?: return
 
-        val needsReveal = initializeLifeIfNeeded(mgr)
-
-        if (lifeCycleJob?.isActive != true) {
-            val revealG = pendingRevealGrid
-            val revealT = pendingRevealType
-            pendingRevealGrid = null
-            pendingRevealType = null
-
-            lifeCycleJob = backgroundScope.launch {
-                if (needsReveal && revealG != null && revealT != null) {
-                    try {
-                        StartingAnimation.playAnimation(mgr, revealG, BRIGHTNESS, revealT)
-                        currentLifeAnimComplete = true
-                        saveLifeState(currentEngine!!.getGrid(), 0, currentLifeStartingAnimType, true)
-                    } catch (e: Exception) {
-                        Log.w("EndlessLife", "Reveal animation failed", e)
-                    }
-                }
-                runDriver(mgr, currentEngine!!)
-            }
-        } else if (currentEngine != null) {
-            // Warm attach on AOD heartbeat: push current frame.
-            try {
-                mgr.setMatrixFrame(GlyphRenderer.render(currentEngine!!.getGrid(), BRIGHTNESS))
-            } catch (_: Exception) {}
-        }
+        ensureDriverAndForeground()
+        ensureAodForeground()
     }
 
     private fun resetCurrentLifeAnimationState() {
@@ -300,6 +311,8 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
             prepareAndPlayNewLife(manager, engine)
             runDriver(manager, engine)
         }
+
+        ensureAodForeground()
     }
 
     /**
@@ -331,10 +344,184 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
         }
     }
 
+    private fun createNotificationChannel() {
+        val channel = NotificationChannel(
+            NOTIF_CHANNEL_ID,
+            getString(R.string.aod_channel_name),
+            NotificationManager.IMPORTANCE_LOW
+        ).apply {
+            description = getString(R.string.aod_channel_description)
+            setShowBadge(false)
+            setSound(null, null)
+            enableLights(false)
+            enableVibration(false)
+        }
+        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.createNotificationChannel(channel)
+    }
+
+    private fun buildAodNotification(): Notification {
+        return Notification.Builder(this, NOTIF_CHANNEL_ID)
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .setContentTitle(getString(R.string.aod_notification_title))
+                .setContentText(getString(R.string.aod_notification_text))
+                .setOngoing(true)
+                .setAutoCancel(false)
+                .build()
+    }
+
+    private fun startForegroundIfNeeded() {
+        if (isForegroundActive) return
+        try {
+            val startIntent = Intent(this, EndlessLifeService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(startIntent)
+            } else {
+                startService(startIntent)
+            }
+            val notif = buildAodNotification()
+            if (Build.VERSION.SDK_INT >= 34) {
+                startForeground(NOTIF_ID, notif, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+            } else {
+                startForeground(NOTIF_ID, notif)
+            }
+            isForegroundActive = true
+            Log.d("EndlessLife", "startForeground")
+        } catch (e: Exception) {
+            Log.w("EndlessLife", "startFg failed", e)
+        }
+    }
+
+    private fun stopForegroundIfActive() {
+        if (!isForegroundActive) return
+        try {
+            if (Build.VERSION.SDK_INT >= 24) {
+                stopForeground(android.app.Service.STOP_FOREGROUND_REMOVE)
+            } else {
+                @Suppress("DEPRECATION")
+                stopForeground(true)
+            }
+        } catch (_: Exception) {}
+        isForegroundActive = false
+        Log.d("EndlessLife", "stopForeground")
+    }
+
+    private fun acquireAodWakeLockIfNeeded() {
+        if (wakeLock?.isHeld == true) return
+        try {
+            val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+            wakeLock = pm.newWakeLock(
+                PowerManager.PARTIAL_WAKE_LOCK,
+                "EndlessLife:AOD"
+            ).apply {
+                setReferenceCounted(false)
+                acquire()
+            }
+            Log.d("EndlessLife", "wake acquired")
+        } catch (e: Exception) {
+            Log.w("EndlessLife", "wake failed", e)
+        }
+    }
+
+    private fun releaseAodWakeLockIfHeld() {
+        try {
+            wakeLock?.let { if (it.isHeld) it.release() }
+        } catch (_: Exception) {}
+        wakeLock = null
+    }
+
+    private fun ensureAodForeground() {
+        acquireAodWakeLockIfNeeded()
+        startForegroundIfNeeded()
+    }
+
+    private fun requestIgnoreBatteryOptimizationsIfNeeded() {
+        try {
+            val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+            if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+                Log.w("EndlessLife", "Not ignoring battery optimizations - this will cause pauses on battery. Requesting exemption...")
+                val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                    data = Uri.parse("package:$packageName")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                startActivity(intent)
+            }
+        } catch (e: Exception) {
+            Log.w("EndlessLife", "Battery opt check/request failed", e)
+        }
+    }
+
+    private fun ensureDriverAndForeground() {
+        if (lifeCycleJob?.isActive == true && currentEngine != null) {
+            ensureAodForeground()
+            glyphMatrixManager?.let { mgr ->
+                try {
+                    mgr.setMatrixFrame(GlyphRenderer.render(currentEngine!!.getGrid(), BRIGHTNESS))
+                } catch (_: Exception) {}
+            }
+            return
+        }
+        Log.d("EndlessLife", "ensureDriver: waiting connect")
+    }
+
+    /**
+     * Start the sim driver early (no manager needed for stepping) so it keeps
+     * progressing in bg even if the system has not bound yet or after process
+     * restarts. When a manager becomes available we will push/play as needed.
+     */
+    private fun ensureDriverStartedEarly() {
+        if (lifeCycleJob?.isActive == true && currentEngine != null) return
+
+        val settings = settingsRepository.getSettings()
+        val persisted = if (settings.resumeEnabled) loadLifeState() else null
+
+        val engine = LifeGameEngine()
+        var initialGridForReveal: Array<IntArray>? = null
+        var animTypeForThisLife: StartingAnimationType? = null
+
+        when {
+            persisted == null -> {
+                val (grid, type) = generateFreshPattern()
+                currentLifeStartingAnimType = type
+                currentLifeAnimComplete = false
+                engine.setGrid(grid)
+                initialGridForReveal = grid
+                animTypeForThisLife = type
+            }
+            !persisted.startingAnimComplete -> {
+                val type = persisted.startingAnimType
+                    ?: (settings.enabledAnimations.randomOrNull() ?: StartingAnimationType.ROW_BY_ROW)
+                currentLifeStartingAnimType = type
+                currentLifeAnimComplete = false
+                engine.setGrid(persisted.grid)
+                initialGridForReveal = persisted.grid
+                animTypeForThisLife = type
+            }
+            else -> {
+                currentLifeStartingAnimType = null
+                currentLifeAnimComplete = true
+                engine.setGrid(persisted.grid)
+            }
+        }
+        currentEngine = engine
+        pendingRevealGrid = initialGridForReveal
+        pendingRevealType = animTypeForThisLife
+
+        lifeCycleJob = backgroundScope.launch {
+            // If we have a pending reveal we can't play it yet (no manager).
+            // Leave it pending; the first connect with a manager will play it.
+            // For pure bg progression we just use the grid as-is.
+            runDriver(null, engine)
+        }
+        ensureAodForeground()
+    }
+
+    // ==================== FG helpers (AOD) ====================
+
     /**
      * The main simulation loop. Keeps the Conway engine stepping at the configured rate.
-     * Renders only when manager available (falls back to captured one).
-     * Sim continues across unbind gaps (AOD uses short binds).
+     * Renders only when manager available.
+     * Sim continues across unbind gaps for AOD (FG keeps process alive).
      */
     private suspend fun runDriver(manager: GlyphMatrixManager?, engine: LifeGameEngine) {
         val stability = StabilityDetector()
@@ -344,6 +531,10 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
         stability.reset()
 
         while (currentCoroutineContext().isActive) {
+            // Always normal speed (no separate ambient speed, no timeout)
+            val s = settingsRepository.getSettings()
+            currentSpeed = s.simulationSpeedMs
+
             val currentGrid = engine.getGrid()
             val frame = GlyphRenderer.render(currentGrid, BRIGHTNESS)
 
@@ -386,14 +577,22 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
                 stability.reset()
                 stableSince = 0L
 
-                val s = settingsRepository.getSettings()
-                currentSpeed = s.simulationSpeedMs
+                currentSpeed = settingsRepository.getSettings().simulationSpeedMs
 
                 continue
             }
 
             delay(currentSpeed)
             engine.step()
+
+            // Periodic save so we don't lose too much progress if process is killed by system
+            // (saves also happen on unbind)
+            if (System.currentTimeMillis() - (lastSaveTime ?: 0) > 30000) {
+                if (currentEngine != null) {
+                    saveLifeState(currentEngine!!.getGrid(), -1, currentLifeStartingAnimType, currentLifeAnimComplete)
+                }
+                lastSaveTime = System.currentTimeMillis()
+            }
         }
     }
 
@@ -438,7 +637,7 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
         val lastSave: Long
     )
 
-    private fun loadLifeState(): PersistedLifeState? {
+    private fun loadLifeState(ignoreAge: Boolean = false): PersistedLifeState? {
         try {
             val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             val flat = prefs.getString(KEY_GRID, null) ?: return null
@@ -447,16 +646,18 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
             val animComplete = prefs.getBoolean(KEY_STARTING_ANIM_COMPLETE, false)
             val lastSave = prefs.getLong(KEY_LAST_SAVE, 0)
 
-            // Enforce max resume age (from settings, default 5min).
-            val maxAgeMin = try {
-                getSharedPreferences("endless_life_settings", Context.MODE_PRIVATE)
-                    .getInt("max_resume_age_minutes", 5)
-            } catch (_: Exception) { 5 }
-            val maxAgeMs = maxAgeMin.coerceIn(1, 60) * 60_000L
+            if (!ignoreAge) {
+                // Enforce max resume age (from settings, default 5min).
+                val maxAgeMin = try {
+                    getSharedPreferences("endless_life_settings", Context.MODE_PRIVATE)
+                        .getInt("max_resume_age_minutes", 5)
+                } catch (_: Exception) { 5 }
+                val maxAgeMs = maxAgeMin.coerceIn(1, 60) * 60_000L
 
-            if (System.currentTimeMillis() - lastSave > maxAgeMs) {
-                clearLifeState()
-                return null
+                if (System.currentTimeMillis() - lastSave > maxAgeMs) {
+                    clearLifeState()
+                    return null
+                }
             }
 
             if (flat.length != GlyphRenderer.FRAME_SIZE) return null
@@ -487,6 +688,8 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
         }
     }
 
+
+
     // ==================== End State Persistence ====================
 
     private companion object {
@@ -502,5 +705,9 @@ class EndlessLifeService : GlyphMatrixService("Endless-Life") {
         private const val KEY_LAST_SAVE = "last_save"
         private const val KEY_STARTING_ANIM_TYPE = "starting_anim_type"
         private const val KEY_STARTING_ANIM_COMPLETE = "starting_anim_complete"
+
+        // FG notif for AOD persistent mode
+        private const val NOTIF_ID = 4242
+        private const val NOTIF_CHANNEL_ID = "endless_life_aod_ambient"
     }
 }

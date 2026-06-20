@@ -2,4 +2,10 @@
     <string name="app_name">Endless Life</string>
     <string name="toy_name">Endless Life</string>
     <string name="toy_summary">Game of Life on the Glyph Matrix</string>
+
+    <!-- FG notif when running as Always-on Glyph Toy -->
+    <string name="aod_channel_name">Always-On</string>
+    <string name="aod_channel_description">Keeps Endless Life simulation running for AOD</string>
+    <string name="aod_notification_title">Endless Life — Always-on</string>
+    <string name="aod_notification_text">Simulation running</string>
 </resources>
