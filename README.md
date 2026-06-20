@@ -16,7 +16,7 @@ Conway's Game of Life for the Nothing Phone (3) Glyph Matrix.
 
 1. Open [github.com/the-ivan/endless-life/releases](https://github.com/the-ivan/endless-life/releases) on your phone (or download the APK on a PC and transfer it).
 2. Under the latest release, download **endless-life-1.0.0.apk** (version in the filename matches the release tag).
-3. Optional — verify the APK on [Koodous](https://koodous.com/apks/e7a6c8468b8048f5996f5638816166102c024d45056fe8a8dc9261b9c0536bf9) before installing.
+3. Optional — verify before installing: [Koodous](https://koodous.com/apks/e7a6c8468b8048f5996f5638816166102c024d45056fe8a8dc9261b9c0536bf9) · [VirusTotal](https://www.virustotal.com/gui/url/f9d3d10cb884f30f680015c72c11dddefda564b131b08b94abc653567bfba962)
 4. Open the downloaded file and install. If Android blocks it, allow installs from your browser or Files app when prompted.
 5. Launch **Endless Life** and tap **Open Glyph Toys Manager**, then enable **Endless Life**.
 6. Optional — Always-on: in Glyph Toys Manager, set **Endless Life** as your Always-on Glyph Toy (Flip to Glyph). In the app, tap **Open App Settings** and set Battery background usage to **Unrestricted**.
