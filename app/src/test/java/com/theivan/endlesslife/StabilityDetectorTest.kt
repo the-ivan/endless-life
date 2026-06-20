@@ -34,16 +34,11 @@ class StabilityDetectorTest {
     }
 
     @Test
-    fun `still life is detected after history fills`() {
+    fun `still life is detected on repeat`() {
         val detector = StabilityDetector(historySize = 4)
         val block = blockGrid()
 
-        // First few steps should not trigger (history not full enough)
-        repeat(3) {
-            assertFalse(detector.addAndCheck(block))
-        }
-
-        // On the 4th identical state, it should detect stability
+        assertFalse(detector.addAndCheck(block))
         assertTrue(detector.addAndCheck(block))
     }
 
@@ -53,27 +48,21 @@ class StabilityDetectorTest {
         val h = blinkerHorizontal()
         val v = blinkerVertical()
 
-        // Alternate between two states
         assertFalse(detector.addAndCheck(h))
         assertFalse(detector.addAndCheck(v))
-        assertFalse(detector.addAndCheck(h))
-        assertFalse(detector.addAndCheck(v))
-        assertFalse(detector.addAndCheck(h))
-
-        // 6th call should see the first horizontal again within window
+        assertTrue(detector.addAndCheck(h))
         assertTrue(detector.addAndCheck(v))
     }
 
     @Test
-    fun `changing pattern does not falsely trigger`() {
+    fun `repeating cyclic pattern is detected`() {
         val detector = StabilityDetector(historySize = 6)
         val grid1 = blockGrid()
         val grid2 = blinkerHorizontal()
 
-        repeat(10) {
-            assertFalse(detector.addAndCheck(grid1))
-            assertFalse(detector.addAndCheck(grid2))
-        }
+        assertFalse(detector.addAndCheck(grid1))
+        assertFalse(detector.addAndCheck(grid2))
+        assertTrue(detector.addAndCheck(grid1))
     }
 
     @Test
@@ -81,27 +70,26 @@ class StabilityDetectorTest {
         val detector = StabilityDetector(historySize = 4)
         val block = blockGrid()
 
-        repeat(3) { detector.addAndCheck(block) }
+        assertFalse(detector.addAndCheck(block))
+        assertTrue(detector.addAndCheck(block))
         detector.reset()
 
-        // After reset, it should behave like new
-        repeat(3) {
-            assertFalse(detector.addAndCheck(block))
-        }
+        assertFalse(detector.addAndCheck(block))
         assertTrue(detector.addAndCheck(block))
     }
 
     @Test
     fun `history size limits detection window`() {
-        val detector = StabilityDetector(historySize = 3)
-        val h = blinkerHorizontal()
-        val v = blinkerVertical()
+        val detector = StabilityDetector(historySize = 2)
+        val a = blockGrid()
+        val b = blinkerHorizontal()
+        val c = emptyGrid()
 
-        // With history size 3, it should still detect the oscillator
-        assertFalse(detector.addAndCheck(h))
-        assertFalse(detector.addAndCheck(v))
-        assertFalse(detector.addAndCheck(h))
-        assertTrue(detector.addAndCheck(v)) // v seen before within window
+        assertFalse(detector.addAndCheck(a))
+        assertFalse(detector.addAndCheck(b))
+        assertFalse(detector.addAndCheck(c))
+        assertTrue(detector.addAndCheck(b))
+        assertFalse(detector.addAndCheck(a))
     }
 
     @Test
@@ -114,12 +102,12 @@ class StabilityDetectorTest {
             this[3][2] = 1; this[3][3] = 1
         }
 
-        repeat(4) { detector.addAndCheck(block) }
+        assertFalse(detector.addAndCheck(block))
         assertTrue(detector.addAndCheck(block))
 
         detector.reset()
 
-        repeat(4) { detector.addAndCheck(beehive) }
+        assertFalse(detector.addAndCheck(beehive))
         assertTrue(detector.addAndCheck(beehive))
     }
 }

@@ -1,28 +1,30 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+val keystoreProperties = Properties().apply {
+    val keystorePropertiesFile = rootProject.file("keystore.properties")
+    if (keystorePropertiesFile.exists()) {
+        load(keystorePropertiesFile.inputStream())
+    }
+}
+
 android {
     namespace = "com.theivan.endlesslife"
     compileSdk = 35
 
-    signingConfigs {
-        create("release") {
-            storeFile = file(System.getenv("USERPROFILE") + "/.android/debug.keystore")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
-        }
-    }
-
     defaultConfig {
         applicationId = "com.theivan.endlesslife"
+        // NOTE: The official Nothing GlyphMatrix SDK declares minSdk 33 internally.
+        // Do NOT lower this value or the manifest merger will fail.
         minSdk = 33
         targetSdk = 35
         versionCode = 10
-        versionName = "0.9.5"
+        versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -30,11 +32,20 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            keyAlias = keystoreProperties["keyAlias"] as String
+            keyPassword = keystoreProperties["keyPassword"] as String
+            storeFile = rootProject.file(keystoreProperties["storeFile"] as String)
+            storePassword = keystoreProperties["storePassword"] as String
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
-            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -58,6 +69,15 @@ android {
     }
 }
 
+@Suppress("DEPRECATION")
+android.applicationVariants.configureEach {
+    if (buildType.name != "release") return@configureEach
+    outputs.configureEach {
+        (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl)
+            .outputFileName = "endless-life-$versionName.apk"
+    }
+}
+
 dependencies {
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
@@ -65,9 +85,10 @@ dependencies {
     implementation(platform("androidx.compose:compose-bom:2024.12.01"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
-    implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.material:material-icons-extended")  // Icons.Default.* ; tree-shaken by R8 in release
+    implementation("androidx.compose.material:material-icons-core")
+
+    debugImplementation("androidx.compose.ui:ui-tooling-preview")
 
     // Nothing Glyph Matrix SDK
     // IMPORTANT: Download glyph-matrix-sdk-2.0.aar (or latest) from:

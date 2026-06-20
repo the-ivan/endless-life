@@ -39,10 +39,11 @@ captures/
 *.iml
 .idea
 
-# Keystore files
-# Uncomment the following lines if you do not want to check your keystore files in.
-#*.jks
-#*.keystore
+# Signing (local only — never commit)
+*.jks
+*.keystore
+keystore.properties
+signing/
 
 # External native build folder generated in Android Studio 2.2 and later
 .externalNativeBuild
@@ -88,15 +89,15 @@ Thumbs.db
 
 # Nothing Glyph Matrix SDK AAR (must be downloaded manually)
 app/libs/*.aar
+app/libs/*.zip
+app/libs/glyph-matrix-sdk-extracted/
+app/libs/glyph-classes/
 
 # Historical AOD keepalive proposal (not for source control)
 PROPOSAL_AOD_ALWAYS_ON.md
 
 # Release outputs
 app/release/
-
-# Any local signing configs
-signing/
 
 AGENTS.md
 CLAUDE.md

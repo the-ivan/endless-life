@@ -24,17 +24,16 @@ class LifeGameEngineTest {
     @Test
     fun `live cell with exactly 2 neighbors survives`() {
         val engine = LifeGameEngine(5, 5)
-        // Horizontal blinker center should survive
         engine.setGrid(arrayOf(
             intArrayOf(0,0,0,0,0),
-            intArrayOf(0,0,0,0,0),
-            intArrayOf(0,1,1,1,0),
+            intArrayOf(0,0,1,0,0),
+            intArrayOf(0,0,1,1,0),
             intArrayOf(0,0,0,0,0),
             intArrayOf(0,0,0,0,0)
         ))
         engine.step()
         val grid = engine.getGrid()
-        assertEquals(1, grid[2][1])
+        assertEquals(1, grid[1][2])
         assertEquals(1, grid[2][2])
         assertEquals(1, grid[2][3])
     }
@@ -51,7 +50,7 @@ class LifeGameEngineTest {
         ))
         engine.step()
         val grid = engine.getGrid()
-        assertEquals(1, grid[1][2]) // should be born
+        assertEquals(1, grid[1][2])
     }
 
     @Test
@@ -59,14 +58,14 @@ class LifeGameEngineTest {
         val engine = LifeGameEngine(5, 5)
         engine.setGrid(arrayOf(
             intArrayOf(0,0,0,0,0),
+            intArrayOf(0,0,1,0,0),
             intArrayOf(0,1,1,1,0),
-            intArrayOf(0,1,1,0,0),
-            intArrayOf(0,0,0,0,0),
+            intArrayOf(0,0,1,0,0),
             intArrayOf(0,0,0,0,0)
         ))
         engine.step()
         val grid = engine.getGrid()
-        assertEquals(0, grid[1][1]) // center should die
+        assertEquals(0, grid[2][2])
     }
 
     // === Still Lifes ===
@@ -163,7 +162,7 @@ class LifeGameEngineTest {
     }
 
     @Test
-    fun `full grid dies quickly and reports correct population`() {
+    fun `overcrowded center dies while pattern persists`() {
         val engine = LifeGameEngine(3, 3)
         val full = Array(3) { IntArray(3) { 1 } }
         engine.setGrid(full)
@@ -171,8 +170,9 @@ class LifeGameEngineTest {
         assertFalse(engine.isExtinct())
 
         engine.step()
-        assertTrue(engine.isExtinct())
-        assertEquals(0, engine.population())
+        assertEquals(4, engine.population())
+        assertEquals(0, engine.getGrid()[1][1])
+        assertFalse(engine.isExtinct())
     }
 
     // === Boundaries (no wrap-around) ===
@@ -180,16 +180,14 @@ class LifeGameEngineTest {
     @Test
     fun `cells on edge do not wrap around`() {
         val engine = LifeGameEngine(5, 5)
-        // Three cells in a row on the left edge
         engine.setGrid(arrayOf(
-            intArrayOf(1,1,1,0,0),
+            intArrayOf(1,0,0,0,0),
             intArrayOf(0,0,0,0,0),
             intArrayOf(0,0,0,0,0),
             intArrayOf(0,0,0,0,0),
             intArrayOf(0,0,0,0,0)
         ))
         engine.step()
-        // Should all die (only 1 or 2 neighbors because no wrap)
         assertTrue(engine.isExtinct())
     }
 

@@ -27,6 +27,5 @@ data class EndlessLifeSettings(
     val enabledAnimations: Set<StartingAnimationType> = StartingAnimationType.entries.toSet(),
     val simulationSpeedMs: Long = 220L,
     val initialDensity: Double = 0.33,
-    val resumeEnabled: Boolean = true,
-    val maxResumeAgeMinutes: Int = 5
+    val resumeEnabled: Boolean = true
 )

@@ -1,7 +1,9 @@
 package com.theivan.endlesslife
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedVisibility
@@ -9,8 +11,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -37,6 +39,16 @@ class MainActivity : ComponentActivity() {
                 ) {
                     EndlessLifeSettingsScreen(
                         repository = settingsRepository,
+                        onOpenAppSettings = {
+                            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                data = Uri.fromParts("package", packageName, null)
+                            }
+                            try {
+                                startActivity(intent)
+                            } catch (_: Exception) {
+                                // System app settings unavailable
+                            }
+                        },
                         onOpenGlyphSettings = {
                             val intent = Intent().apply {
                                 setComponent(
@@ -48,8 +60,8 @@ class MainActivity : ComponentActivity() {
                             }
                             try {
                                 startActivity(intent)
-                            } catch (e: Exception) {
-                                // Fallback - Glyph Toys Manager not available
+                            } catch (_: Exception) {
+                                // Glyph Toys Manager not available
                             }
                         }
                     )
@@ -85,7 +97,7 @@ private fun CollapsibleSection(
                     style = MaterialTheme.typography.titleMedium
                 )
                 Icon(
-                    imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                     contentDescription = if (expanded) "Collapse" else "Expand"
                 )
             }
@@ -106,6 +118,7 @@ private fun CollapsibleSection(
 @Composable
 fun EndlessLifeSettingsScreen(
     repository: SettingsRepository,
+    onOpenAppSettings: () -> Unit,
     onOpenGlyphSettings: () -> Unit
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
@@ -248,16 +261,6 @@ fun EndlessLifeSettingsScreen(
             Text("Resume interrupted simulations")
         }
 
-        Spacer(Modifier.height(12.dp))
-
-        Text("Max Resume Age: ${settings.maxResumeAgeMinutes} ${if (settings.maxResumeAgeMinutes == 1) "minute" else "minutes"}")
-        Slider(
-            value = settings.maxResumeAgeMinutes.toFloat(),
-            onValueChange = { updateSettings(settings.copy(maxResumeAgeMinutes = it.toInt())) },
-            valueRange = 1f..15f,
-            steps = 13
-        )
-
         }
 
         Spacer(Modifier.height(32.dp))
@@ -274,6 +277,23 @@ fun EndlessLifeSettingsScreen(
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(if (hasUnsavedChanges) "Save Changes" else "Saved")
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        Text(
+            text = "For uninterrupted Always-on play on battery, open app settings and set Battery background usage to Unrestricted.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Spacer(Modifier.height(8.dp))
+
+        OutlinedButton(
+            onClick = onOpenAppSettings,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Open App Settings")
         }
 
         Spacer(Modifier.height(12.dp))

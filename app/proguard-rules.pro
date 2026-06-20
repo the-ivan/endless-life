@@ -8,27 +8,22 @@
 # Keep Nothing Glyph SDK classes
 -keep class com.nothing.ketchum.** { *; }
 
-# Keep Compose runtime (R8/AGP usually handles, but be explicit for safety)
--keep class androidx.compose.** { *; }
--keep class androidx.compose.runtime.** { *; }
+# Glyph Toy services
+-keep class com.theivan.endlesslife.EndlessLifeService { *; }
+-keep class com.theivan.endlesslife.GlyphMatrixService { *; }
 
-# Coroutines
--keep class kotlinx.coroutines.** { *; }
--dontwarn kotlinx.coroutines.**
+# Enum persistence (StartingAnimationType saved by name)
+-keepclassmembers enum com.theivan.endlesslife.StartingAnimationType {
+    public static **[] values();
+    public static ** valueOf(java.lang.String);
+}
 
-# Strip debug logs in release (reduce size and hide debug info)
+# Strip debug logs in release
 -assumenosideeffects class android.util.Log {
     public static *** d(...);
     public static *** v(...);
     public static *** i(...);
 }
-
-# Keep service for Glyph toy binding
--keep class com.theivan.endlesslife.EndlessLifeService { *; }
-
-# Keep reflection for settings / enums if any
--keepclassmembers class **.EndlessLifeSettings { *; }
--keepclassmembers enum **.StartingAnimationType { *; }
 
 # Standard Android/Kotlin keeps
 -keepattributes Signature,Annotation,InnerClasses,EnclosingMethod

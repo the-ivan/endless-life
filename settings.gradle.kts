@@ -16,5 +16,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "GlyphLife-Phone3"
+rootProject.name = "Endless Life"
 include(":app")

@@ -37,7 +37,7 @@ abstract class GlyphMatrixService(private val tag: String) : Service() {
         override fun handleMessage(msg: Message) {
             when (msg.what) {
                 GlyphToy.MSG_GLYPH_TOY -> {
-                    msg.data?.getString("data")?.let { event ->
+                    msg.data?.getString(GlyphToy.MSG_GLYPH_TOY_DATA)?.let { event ->
                         when (event) {
                             GlyphToy.EVENT_ACTION_DOWN -> onGlyphTouchDown()
                             GlyphToy.EVENT_ACTION_UP -> onGlyphTouchUp()
@@ -84,11 +84,22 @@ abstract class GlyphMatrixService(private val tag: String) : Service() {
                 else -> Glyph.DEVICE_23112
             }
 
-            mgr.register(deviceConstant)
+            val registered = try {
+                mgr.register(deviceConstant)
+            } catch (t: Throwable) {
+                Log.w(LOG_TAG, "$tag: register($deviceConstant) threw", t)
+                false
+            }
+
+            if (!registered) {
+                Log.w(LOG_TAG, "$tag: Matrix register failed — toy cannot render")
+                return
+            }
 
             if (length != 25) {
                 Log.w(LOG_TAG, "$tag: This toy (Endless Life) is built for the 25×25 Glyph Matrix on Phone (3). " +
                         "Current device reports length=$length. Rendering will be disabled.")
+                return
             }
 
             performOnServiceConnected(applicationContext, mgr)
@@ -98,7 +109,6 @@ abstract class GlyphMatrixService(private val tag: String) : Service() {
     }
 
     override fun onBind(intent: Intent?): IBinder? {
-        Log.e(LOG_TAG, ">>> $tag: onBind CALLED <<<")
         GlyphMatrixManager.getInstance(applicationContext)?.let { gmm ->
             glyphMatrixManager = gmm
             gmm.init(callback)
@@ -107,7 +117,6 @@ abstract class GlyphMatrixService(private val tag: String) : Service() {
     }
 
     override fun onUnbind(intent: Intent?): Boolean {
-        Log.e(LOG_TAG, ">>> $tag: onUnbind CALLED <<<")
         performOnServiceDisconnected(applicationContext)
         glyphMatrixManager?.turnOff()
         glyphMatrixManager?.unInit()
